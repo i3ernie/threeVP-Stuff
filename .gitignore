@@ -61,3 +61,4 @@ typings/
 .next
 /nbproject/private/
 /package-lock.json
+/nbproject/
