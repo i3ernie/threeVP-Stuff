@@ -1,8 +1,9 @@
 {
   "name": "threeVP-Stuff",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "description": "some nice stuff for threeVP",
+  "repository": "",
   "keywords": [
     "three.js",
     "WebGL",
@@ -10,12 +11,11 @@
   ],
   "author": "i3ernie",
   "contributors": [],
-
-  "dependencies": {    
+  "dependencies": {
     "lodash": "^4.17.10",
+    "stats-js": "latest",
     "threeVP": "git://github.com/i3ernie/threeVP.js.git",
     "threeVP-Extras": "git://github.com/i3ernie/threeVP-Extras.js.git",
-    "stats-js": "latest",
     "tween.js": "latest"
   },
   "devDependencies": {
@@ -23,11 +23,10 @@
     "gulp-load-plugins": "latest",
     "gulp-requirejs": "latest",
     "gulp-uglify": "latest",
-        
-    "requirejs"         : "latest",
-    "requirejs-less"    : "latest",
-    "requirejs-plugins" : "latest",
-    "requirejs-text"    : "latest"
+    "requirejs": "latest",
+    "requirejs-less": "latest",
+    "requirejs-plugins": "latest",
+    "requirejs-text": "latest"
   },
   "directories": {
     "doc": "docs",
@@ -45,6 +44,7 @@
     "src"
   ],
   "scripts": {
+    "update": "npm update",
     "build": "gulp build"
   }
 }
