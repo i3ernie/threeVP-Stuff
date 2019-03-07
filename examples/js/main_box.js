@@ -6,7 +6,6 @@ require.config({
         "conf"          : "../conf",
        
         "img"           : "../img",
-        "style"         : "css",
       
         "Mirror"      :"vendor/threejs/extras/Mirror",
 
@@ -14,7 +13,7 @@ require.config({
     }
 });
 
-require(["examples/js/app_terrain", "async"], function ( APP, async ) {
+require(["examples/js/app_box", "async"], function ( APP, async ) {
 
     let myApp = new APP();
     

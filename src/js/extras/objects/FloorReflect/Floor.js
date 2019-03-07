@@ -5,7 +5,7 @@
  */
 define(["three", "module", "lodash", "extras/Planemirror", "objects/Floor/Floor"], function( THREE, module, _, Planemirror, Floor )
 { 
-    var options = {
+    var defaults = {
             size : [ 20, 20 ],
             biasMirror : .5,
             reflection : .1
@@ -13,7 +13,7 @@ define(["three", "module", "lodash", "extras/Planemirror", "objects/Floor/Floor"
         
     var FloorR = function( VP, opt )
     {
-        Floor.call( this, _.extend({}, options, opt) );
+        Floor.call( this, _.extend({}, defaults, opt) );
 
         this.material.transparent = true;
         this.material.opacity = 1 - this.options.reflection;
@@ -28,7 +28,6 @@ define(["three", "module", "lodash", "extras/Planemirror", "objects/Floor/Floor"
     //inherits from Mesh
     FloorR.prototype = Object.create( Floor.prototype );
     FloorR.prototype.constructor = FloorR;
-    FloorR.prototype.super = THREE.Floor;
 
     return FloorR;
 });

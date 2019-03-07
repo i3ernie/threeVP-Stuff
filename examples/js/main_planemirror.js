@@ -14,7 +14,7 @@ require.config({
     }
 });
 
-require(["examples/js/app_terrain", "async"], function ( APP, async ) {
+require(["examples/js/app_planemirror", "async"], function ( APP, async ) {
 
     let myApp = new APP();
     

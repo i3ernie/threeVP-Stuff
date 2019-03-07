@@ -49,7 +49,8 @@ gulp.task('init:modules', ( done ) => {
 gulp.task('init:folder', ( done ) => {
      let folders = [
         './src/js/vendor',
-        './src/js/vendor/three'
+        './src/js/vendor/three',
+        './src/js/vendor/three/extras'
     ];
     
     _.each( folders, function( folder )
