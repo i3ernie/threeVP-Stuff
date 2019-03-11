@@ -8,7 +8,7 @@ require.config({
         "img"           : "../img",
         "style"         : "css",
       
-        "Mirror"      :"vendor/threejs/extras/Mirror",
+        "Mirror"      :"vendor/three/extras/Mirror",
 
         "plugin"        :"plugins/plugin"
     }

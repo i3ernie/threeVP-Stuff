@@ -17909,6 +17909,1222 @@ function( MaterialFactory ) {
      };
 });
 
+define('modifiers/ExplodeModifier',["three"], function(THREE){
+/**
+ * Make all faces use unique vertices
+ * so that each face can be separated from others
+ *
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.ExplodeModifier = function () {
+
+};
+
+THREE.ExplodeModifier.prototype.modify = function ( geometry ) {
+
+	var vertices = [];
+
+	for ( var i = 0, il = geometry.faces.length; i < il; i ++ ) {
+
+		var n = vertices.length;
+
+		var face = geometry.faces[ i ];
+
+		var a = face.a;
+		var b = face.b;
+		var c = face.c;
+
+		var va = geometry.vertices[ a ];
+		var vb = geometry.vertices[ b ];
+		var vc = geometry.vertices[ c ];
+
+		vertices.push( va.clone() );
+		vertices.push( vb.clone() );
+		vertices.push( vc.clone() );
+
+		face.a = n;
+		face.b = n + 1;
+		face.c = n + 2;
+
+	}
+
+	geometry.vertices = vertices;
+
+};
+
+ return THREE.ExplodeModifier;
+});
+define('modifiers/SimplifyModifier',["three"], function(THREE){
+/*
+ *	@author zz85 / http://twitter.com/blurspline / http://www.lab4games.net/zz85/blog
+ *
+ *	Simplification Geometry Modifier
+ *    - based on code and technique
+ *	  - by Stan Melax in 1998
+ *	  - Progressive Mesh type Polygon Reduction Algorithm
+ *    - http://www.melax.com/polychop/
+ */
+
+THREE.SimplifyModifier = function () {};
+
+( function () {
+
+	var cb = new THREE.Vector3(), ab = new THREE.Vector3();
+
+	function pushIfUnique( array, object ) {
+
+		if ( array.indexOf( object ) === - 1 ) array.push( object );
+
+	}
+
+	function removeFromArray( array, object ) {
+
+		var k = array.indexOf( object );
+		if ( k > - 1 ) array.splice( k, 1 );
+
+	}
+
+	function computeEdgeCollapseCost( u, v ) {
+
+		// if we collapse edge uv by moving u to v then how
+		// much different will the model change, i.e. the "error".
+
+		var edgelength = v.position.distanceTo( u.position );
+		var curvature = 0;
+
+		var sideFaces = [];
+		var i, il = u.faces.length, face, sideFace;
+
+		// find the "sides" triangles that are on the edge uv
+		for ( i = 0; i < il; i ++ ) {
+
+			face = u.faces[ i ];
+
+			if ( face.hasVertex( v ) ) {
+
+				sideFaces.push( face );
+
+			}
+
+		}
+
+		// use the triangle facing most away from the sides
+		// to determine our curvature term
+		for ( i = 0; i < il; i ++ ) {
+
+			var minCurvature = 1;
+			face = u.faces[ i ];
+
+			for ( var j = 0; j < sideFaces.length; j ++ ) {
+
+				sideFace = sideFaces[ j ];
+				// use dot product of face normals.
+				var dotProd = face.normal.dot( sideFace.normal );
+				minCurvature = Math.min( minCurvature, ( 1.001 - dotProd ) / 2 );
+
+			}
+
+			curvature = Math.max( curvature, minCurvature );
+
+		}
+
+		// crude approach in attempt to preserve borders
+		// though it seems not to be totally correct
+		var borders = 0;
+		if ( sideFaces.length < 2 ) {
+
+			// we add some arbitrary cost for borders,
+			// borders += 10;
+			curvature = 1;
+
+		}
+
+		var amt = edgelength * curvature + borders;
+
+		return amt;
+
+	}
+
+	function computeEdgeCostAtVertex( v ) {
+
+		// compute the edge collapse cost for all edges that start
+		// from vertex v.  Since we are only interested in reducing
+		// the object by selecting the min cost edge at each step, we
+		// only cache the cost of the least cost edge at this vertex
+		// (in member variable collapse) as well as the value of the
+		// cost (in member variable collapseCost).
+
+		if ( v.neighbors.length === 0 ) {
+
+			// collapse if no neighbors.
+			v.collapseNeighbor = null;
+			v.collapseCost = - 0.01;
+
+			return;
+
+		}
+
+		v.collapseCost = 100000;
+		v.collapseNeighbor = null;
+
+		// search all neighboring edges for "least cost" edge
+		for ( var i = 0; i < v.neighbors.length; i ++ ) {
+
+			var collapseCost = computeEdgeCollapseCost( v, v.neighbors[ i ] );
+
+			if ( ! v.collapseNeighbor ) {
+
+				v.collapseNeighbor = v.neighbors[ i ];
+				v.collapseCost = collapseCost;
+				v.minCost = collapseCost;
+				v.totalCost = 0;
+				v.costCount = 0;
+
+			}
+
+			v.costCount ++;
+			v.totalCost += collapseCost;
+
+			if ( collapseCost < v.minCost ) {
+
+				v.collapseNeighbor = v.neighbors[ i ];
+				v.minCost = collapseCost;
+
+			}
+
+		}
+
+		// we average the cost of collapsing at this vertex
+		v.collapseCost = v.totalCost / v.costCount;
+		// v.collapseCost = v.minCost;
+
+	}
+
+	function removeVertex( v, vertices ) {
+
+		console.assert( v.faces.length === 0 );
+
+		while ( v.neighbors.length ) {
+
+			var n = v.neighbors.pop();
+			removeFromArray( n.neighbors, v );
+
+		}
+
+		removeFromArray( vertices, v );
+
+	}
+
+	function removeFace( f, faces ) {
+
+		removeFromArray( faces, f );
+
+		if ( f.v1 ) removeFromArray( f.v1.faces, f );
+		if ( f.v2 ) removeFromArray( f.v2.faces, f );
+		if ( f.v3 ) removeFromArray( f.v3.faces, f );
+
+		// TODO optimize this!
+		var vs = [ f.v1, f.v2, f.v3 ];
+		var v1, v2;
+
+		for ( var i = 0; i < 3; i ++ ) {
+
+			v1 = vs[ i ];
+			v2 = vs[ ( i + 1 ) % 3 ];
+
+			if ( ! v1 || ! v2 ) continue;
+
+			v1.removeIfNonNeighbor( v2 );
+			v2.removeIfNonNeighbor( v1 );
+
+		}
+
+	}
+
+	function collapse( vertices, faces, u, v ) { // u and v are pointers to vertices of an edge
+
+		// Collapse the edge uv by moving vertex u onto v
+
+		if ( ! v ) {
+
+			// u is a vertex all by itself so just delete it..
+			removeVertex( u, vertices );
+			return;
+
+		}
+
+		var i;
+		var tmpVertices = [];
+
+		for ( i = 0; i < u.neighbors.length; i ++ ) {
+
+			tmpVertices.push( u.neighbors[ i ] );
+
+		}
+
+
+		// delete triangles on edge uv:
+		for ( i = u.faces.length - 1; i >= 0; i -- ) {
+
+			if ( u.faces[ i ].hasVertex( v ) ) {
+
+				removeFace( u.faces[ i ], faces );
+
+			}
+
+		}
+
+		// update remaining triangles to have v instead of u
+		for ( i = u.faces.length - 1; i >= 0; i -- ) {
+
+			u.faces[ i ].replaceVertex( u, v );
+
+		}
+
+
+		removeVertex( u, vertices );
+
+		// recompute the edge collapse costs in neighborhood
+		for ( i = 0; i < tmpVertices.length; i ++ ) {
+
+			computeEdgeCostAtVertex( tmpVertices[ i ] );
+
+		}
+
+	}
+
+
+
+	function minimumCostEdge( vertices ) {
+
+		// O(n * n) approach. TODO optimize this
+
+		var least = vertices[ 0 ];
+
+		for ( var i = 0; i < vertices.length; i ++ ) {
+
+			if ( vertices[ i ].collapseCost < least.collapseCost ) {
+
+				least = vertices[ i ];
+
+			}
+
+		}
+
+		return least;
+
+	}
+
+	// we use a triangle class to represent structure of face slightly differently
+
+	function Triangle( v1, v2, v3, a, b, c ) {
+
+		this.a = a;
+		this.b = b;
+		this.c = c;
+
+		this.v1 = v1;
+		this.v2 = v2;
+		this.v3 = v3;
+
+		this.normal = new THREE.Vector3();
+
+		this.computeNormal();
+
+		v1.faces.push( this );
+		v1.addUniqueNeighbor( v2 );
+		v1.addUniqueNeighbor( v3 );
+
+		v2.faces.push( this );
+		v2.addUniqueNeighbor( v1 );
+		v2.addUniqueNeighbor( v3 );
+
+
+		v3.faces.push( this );
+		v3.addUniqueNeighbor( v1 );
+		v3.addUniqueNeighbor( v2 );
+
+	}
+
+	Triangle.prototype.computeNormal = function () {
+
+		var vA = this.v1.position;
+		var vB = this.v2.position;
+		var vC = this.v3.position;
+
+		cb.subVectors( vC, vB );
+		ab.subVectors( vA, vB );
+		cb.cross( ab ).normalize();
+
+		this.normal.copy( cb );
+
+	};
+
+	Triangle.prototype.hasVertex = function ( v ) {
+
+		return v === this.v1 || v === this.v2 || v === this.v3;
+
+	};
+
+	Triangle.prototype.replaceVertex = function ( oldv, newv ) {
+
+		if ( oldv === this.v1 ) this.v1 = newv;
+		else if ( oldv === this.v2 ) this.v2 = newv;
+		else if ( oldv === this.v3 ) this.v3 = newv;
+
+		removeFromArray( oldv.faces, this );
+		newv.faces.push( this );
+
+
+		oldv.removeIfNonNeighbor( this.v1 );
+		this.v1.removeIfNonNeighbor( oldv );
+
+		oldv.removeIfNonNeighbor( this.v2 );
+		this.v2.removeIfNonNeighbor( oldv );
+
+		oldv.removeIfNonNeighbor( this.v3 );
+		this.v3.removeIfNonNeighbor( oldv );
+
+		this.v1.addUniqueNeighbor( this.v2 );
+		this.v1.addUniqueNeighbor( this.v3 );
+
+		this.v2.addUniqueNeighbor( this.v1 );
+		this.v2.addUniqueNeighbor( this.v3 );
+
+		this.v3.addUniqueNeighbor( this.v1 );
+		this.v3.addUniqueNeighbor( this.v2 );
+
+		this.computeNormal();
+
+	};
+
+	function Vertex( v, id ) {
+
+		this.position = v;
+
+		this.id = id; // old index id
+
+		this.faces = []; // faces vertex is connected
+		this.neighbors = []; // neighbouring vertices aka "adjacentVertices"
+
+		// these will be computed in computeEdgeCostAtVertex()
+		this.collapseCost = 0; // cost of collapsing this vertex, the less the better. aka objdist
+		this.collapseNeighbor = null; // best candinate for collapsing
+
+	}
+
+	Vertex.prototype.addUniqueNeighbor = function ( vertex ) {
+
+		pushIfUnique( this.neighbors, vertex );
+
+	};
+
+	Vertex.prototype.removeIfNonNeighbor = function ( n ) {
+
+		var neighbors = this.neighbors;
+		var faces = this.faces;
+
+		var offset = neighbors.indexOf( n );
+		if ( offset === - 1 ) return;
+		for ( var i = 0; i < faces.length; i ++ ) {
+
+			if ( faces[ i ].hasVertex( n ) ) return;
+
+		}
+
+		neighbors.splice( offset, 1 );
+
+	};
+
+	THREE.SimplifyModifier.prototype.modify = function ( geometry, count ) {
+
+		if ( geometry.isBufferGeometry ) {
+
+			geometry = new THREE.Geometry().fromBufferGeometry( geometry );
+
+		}
+
+		geometry.mergeVertices();
+
+		var oldVertices = geometry.vertices; // Three Position
+		var oldFaces = geometry.faces; // Three Face
+
+		// conversion
+		var vertices = [];
+		var faces = [];
+
+		var i, il;
+
+		//
+		// put data of original geometry in different data structures
+		//
+
+		// add vertices
+
+		for ( i = 0, il = oldVertices.length; i < il; i ++ ) {
+
+			var vertex = new Vertex( oldVertices[ i ], i );
+			vertices.push( vertex );
+
+		}
+
+		// add faces
+
+		for ( i = 0, il = oldFaces.length; i < il; i ++ ) {
+
+			var face = oldFaces[ i ];
+
+			var a = face.a;
+			var b = face.b;
+			var c = face.c;
+
+			var triangle = new Triangle( vertices[ a ], vertices[ b ], vertices[ c ], a, b, c );
+			faces.push( triangle );
+
+		}
+
+		// compute all edge collapse costs
+
+		for ( i = 0, il = vertices.length; i < il; i ++ ) {
+
+			computeEdgeCostAtVertex( vertices[ i ] );
+
+		}
+
+		var nextVertex;
+
+		var z = count;
+
+		while ( z -- ) {
+
+			nextVertex = minimumCostEdge( vertices );
+
+			if ( ! nextVertex ) {
+
+				console.log( 'THREE.SimplifyModifier: No next vertex' );
+				break;
+
+			}
+
+			collapse( vertices, faces, nextVertex, nextVertex.collapseNeighbor );
+
+		}
+
+		//
+
+		var simplifiedGeometry = new THREE.BufferGeometry();
+		var position = [];
+		var index = [];
+
+		//
+
+		for ( i = 0; i < vertices.length; i ++ ) {
+
+			var vertex = vertices[ i ].position;
+			position.push( vertex.x, vertex.y, vertex.z );
+
+		}
+
+		//
+
+		for ( i = 0; i < faces.length; i ++ ) {
+
+			var face = faces[ i ];
+
+			var a = vertices.indexOf( face.v1 );
+			var b = vertices.indexOf( face.v2 );
+			var c = vertices.indexOf( face.v3 );
+
+			index.push( a, b, c );
+
+		}
+
+		//
+
+		simplifiedGeometry.addAttribute( 'position', new THREE.Float32BufferAttribute( position, 3 ) );
+		simplifiedGeometry.setIndex( index );
+
+		return simplifiedGeometry;
+
+	};
+
+} )();
+
+ return THREE.SimplifyModifier;
+});
+define('modifiers/SubdivisionModifier',["three"], function(THREE){
+/*
+ *	@author zz85 / http://twitter.com/blurspline / http://www.lab4games.net/zz85/blog
+ *	@author centerionware / http://www.centerionware.com
+ *
+ *	Subdivision Geometry Modifier
+ *		using Loop Subdivision Scheme
+ *
+ *	References:
+ *		http://graphics.stanford.edu/~mdfisher/subdivision.html
+ *		http://www.holmes3d.net/graphics/subdivision/
+ *		http://www.cs.rutgers.edu/~decarlo/readings/subdiv-sg00c.pdf
+ *
+ *	Known Issues:
+ *		- currently doesn't handle "Sharp Edges"
+ */
+
+THREE.SubdivisionModifier = function ( subdivisions ) {
+
+	this.subdivisions = ( subdivisions === undefined ) ? 1 : subdivisions;
+
+};
+
+// Applies the "modify" pattern
+THREE.SubdivisionModifier.prototype.modify = function ( geometry ) {
+
+	if ( geometry.isBufferGeometry ) {
+
+		geometry = new THREE.Geometry().fromBufferGeometry( geometry );
+
+	} else {
+
+		geometry = geometry.clone();
+
+	}
+
+	geometry.mergeVertices();
+
+	var repeats = this.subdivisions;
+
+	while ( repeats -- > 0 ) {
+
+		this.smooth( geometry );
+
+	}
+
+	geometry.computeFaceNormals();
+	geometry.computeVertexNormals();
+
+	return geometry;
+
+};
+
+( function () {
+
+	// Some constants
+	var WARNINGS = ! true; // Set to true for development
+	var ABC = [ 'a', 'b', 'c' ];
+
+
+	function getEdge( a, b, map ) {
+
+		var vertexIndexA = Math.min( a, b );
+		var vertexIndexB = Math.max( a, b );
+
+		var key = vertexIndexA + "_" + vertexIndexB;
+
+		return map[ key ];
+
+	}
+
+
+	function processEdge( a, b, vertices, map, face, metaVertices ) {
+
+		var vertexIndexA = Math.min( a, b );
+		var vertexIndexB = Math.max( a, b );
+
+		var key = vertexIndexA + "_" + vertexIndexB;
+
+		var edge;
+
+		if ( key in map ) {
+
+			edge = map[ key ];
+
+		} else {
+
+			var vertexA = vertices[ vertexIndexA ];
+			var vertexB = vertices[ vertexIndexB ];
+
+			edge = {
+
+				a: vertexA, // pointer reference
+				b: vertexB,
+				newEdge: null,
+				// aIndex: a, // numbered reference
+				// bIndex: b,
+				faces: [] // pointers to face
+
+			};
+
+			map[ key ] = edge;
+
+		}
+
+		edge.faces.push( face );
+
+		metaVertices[ a ].edges.push( edge );
+		metaVertices[ b ].edges.push( edge );
+
+
+	}
+
+	function generateLookups( vertices, faces, metaVertices, edges ) {
+
+		var i, il, face;
+
+		for ( i = 0, il = vertices.length; i < il; i ++ ) {
+
+			metaVertices[ i ] = { edges: [] };
+
+		}
+
+		for ( i = 0, il = faces.length; i < il; i ++ ) {
+
+			face = faces[ i ];
+
+			processEdge( face.a, face.b, vertices, edges, face, metaVertices );
+			processEdge( face.b, face.c, vertices, edges, face, metaVertices );
+			processEdge( face.c, face.a, vertices, edges, face, metaVertices );
+
+		}
+
+	}
+
+	function newFace( newFaces, a, b, c, materialIndex ) {
+
+		newFaces.push( new THREE.Face3( a, b, c, undefined, undefined, materialIndex ) );
+
+	}
+
+	function midpoint( a, b ) {
+
+		return ( Math.abs( b - a ) / 2 ) + Math.min( a, b );
+
+	}
+
+	function newUv( newUvs, a, b, c ) {
+
+		newUvs.push( [ a.clone(), b.clone(), c.clone() ] );
+
+	}
+
+	/////////////////////////////
+
+	// Performs one iteration of Subdivision
+	THREE.SubdivisionModifier.prototype.smooth = function ( geometry ) {
+
+		var tmp = new THREE.Vector3();
+
+		var oldVertices, oldFaces, oldUvs;
+		var newVertices, newFaces, newUVs = [];
+
+		var n, i, il, j, k;
+		var metaVertices, sourceEdges;
+
+		// new stuff.
+		var sourceEdges, newEdgeVertices, newSourceVertices;
+
+		oldVertices = geometry.vertices; // { x, y, z}
+		oldFaces = geometry.faces; // { a: oldVertex1, b: oldVertex2, c: oldVertex3 }
+		oldUvs = geometry.faceVertexUvs[ 0 ];
+
+		var hasUvs = oldUvs !== undefined && oldUvs.length > 0;
+
+		/******************************************************
+		 *
+		 * Step 0: Preprocess Geometry to Generate edges Lookup
+		 *
+		 *******************************************************/
+
+		metaVertices = new Array( oldVertices.length );
+		sourceEdges = {}; // Edge => { oldVertex1, oldVertex2, faces[]  }
+
+		generateLookups( oldVertices, oldFaces, metaVertices, sourceEdges );
+
+
+		/******************************************************
+		 *
+		 *	Step 1.
+		 *	For each edge, create a new Edge Vertex,
+		 *	then position it.
+		 *
+		 *******************************************************/
+
+		newEdgeVertices = [];
+		var other, currentEdge, newEdge, face;
+		var edgeVertexWeight, adjacentVertexWeight, connectedFaces;
+
+		for ( i in sourceEdges ) {
+
+			currentEdge = sourceEdges[ i ];
+			newEdge = new THREE.Vector3();
+
+			edgeVertexWeight = 3 / 8;
+			adjacentVertexWeight = 1 / 8;
+
+			connectedFaces = currentEdge.faces.length;
+
+			// check how many linked faces. 2 should be correct.
+			if ( connectedFaces != 2 ) {
+
+				// if length is not 2, handle condition
+				edgeVertexWeight = 0.5;
+				adjacentVertexWeight = 0;
+
+				if ( connectedFaces != 1 ) {
+
+					if ( WARNINGS ) console.warn( 'Subdivision Modifier: Number of connected faces != 2, is: ', connectedFaces, currentEdge );
+
+				}
+
+			}
+
+			newEdge.addVectors( currentEdge.a, currentEdge.b ).multiplyScalar( edgeVertexWeight );
+
+			tmp.set( 0, 0, 0 );
+
+			for ( j = 0; j < connectedFaces; j ++ ) {
+
+				face = currentEdge.faces[ j ];
+
+				for ( k = 0; k < 3; k ++ ) {
+
+					other = oldVertices[ face[ ABC[ k ] ] ];
+					if ( other !== currentEdge.a && other !== currentEdge.b ) break;
+
+				}
+
+				tmp.add( other );
+
+			}
+
+			tmp.multiplyScalar( adjacentVertexWeight );
+			newEdge.add( tmp );
+
+			currentEdge.newEdge = newEdgeVertices.length;
+			newEdgeVertices.push( newEdge );
+
+			// console.log(currentEdge, newEdge);
+
+		}
+
+		/******************************************************
+		 *
+		 *	Step 2.
+		 *	Reposition each source vertices.
+		 *
+		 *******************************************************/
+
+		var beta, sourceVertexWeight, connectingVertexWeight;
+		var connectingEdge, connectingEdges, oldVertex, newSourceVertex;
+		newSourceVertices = [];
+
+		for ( i = 0, il = oldVertices.length; i < il; i ++ ) {
+
+			oldVertex = oldVertices[ i ];
+
+			// find all connecting edges (using lookupTable)
+			connectingEdges = metaVertices[ i ].edges;
+			n = connectingEdges.length;
+
+			if ( n == 3 ) {
+
+				beta = 3 / 16;
+
+			} else if ( n > 3 ) {
+
+				beta = 3 / ( 8 * n ); // Warren's modified formula
+
+			}
+
+			// Loop's original beta formula
+			// beta = 1 / n * ( 5/8 - Math.pow( 3/8 + 1/4 * Math.cos( 2 * Math. PI / n ), 2) );
+
+			sourceVertexWeight = 1 - n * beta;
+			connectingVertexWeight = beta;
+
+			if ( n <= 2 ) {
+
+				// crease and boundary rules
+				// console.warn('crease and boundary rules');
+
+				if ( n == 2 ) {
+
+					if ( WARNINGS ) console.warn( '2 connecting edges', connectingEdges );
+					sourceVertexWeight = 3 / 4;
+					connectingVertexWeight = 1 / 8;
+
+					// sourceVertexWeight = 1;
+					// connectingVertexWeight = 0;
+
+				} else if ( n == 1 ) {
+
+					if ( WARNINGS ) console.warn( 'only 1 connecting edge' );
+
+				} else if ( n == 0 ) {
+
+					if ( WARNINGS ) console.warn( '0 connecting edges' );
+
+				}
+
+			}
+
+			newSourceVertex = oldVertex.clone().multiplyScalar( sourceVertexWeight );
+
+			tmp.set( 0, 0, 0 );
+
+			for ( j = 0; j < n; j ++ ) {
+
+				connectingEdge = connectingEdges[ j ];
+				other = connectingEdge.a !== oldVertex ? connectingEdge.a : connectingEdge.b;
+				tmp.add( other );
+
+			}
+
+			tmp.multiplyScalar( connectingVertexWeight );
+			newSourceVertex.add( tmp );
+
+			newSourceVertices.push( newSourceVertex );
+
+		}
+
+
+		/******************************************************
+		 *
+		 *	Step 3.
+		 *	Generate Faces between source vertices
+		 *	and edge vertices.
+		 *
+		 *******************************************************/
+
+		newVertices = newSourceVertices.concat( newEdgeVertices );
+		var sl = newSourceVertices.length, edge1, edge2, edge3;
+		newFaces = [];
+
+		var uv, x0, x1, x2;
+		var x3 = new THREE.Vector2();
+		var x4 = new THREE.Vector2();
+		var x5 = new THREE.Vector2();
+
+		for ( i = 0, il = oldFaces.length; i < il; i ++ ) {
+
+			face = oldFaces[ i ];
+
+			// find the 3 new edges vertex of each old face
+
+			edge1 = getEdge( face.a, face.b, sourceEdges ).newEdge + sl;
+			edge2 = getEdge( face.b, face.c, sourceEdges ).newEdge + sl;
+			edge3 = getEdge( face.c, face.a, sourceEdges ).newEdge + sl;
+
+			// create 4 faces.
+
+			newFace( newFaces, edge1, edge2, edge3, face.materialIndex );
+			newFace( newFaces, face.a, edge1, edge3, face.materialIndex );
+			newFace( newFaces, face.b, edge2, edge1, face.materialIndex );
+			newFace( newFaces, face.c, edge3, edge2, face.materialIndex );
+
+			// create 4 new uv's
+
+			if ( hasUvs ) {
+
+				uv = oldUvs[ i ];
+
+				x0 = uv[ 0 ];
+				x1 = uv[ 1 ];
+				x2 = uv[ 2 ];
+
+				x3.set( midpoint( x0.x, x1.x ), midpoint( x0.y, x1.y ) );
+				x4.set( midpoint( x1.x, x2.x ), midpoint( x1.y, x2.y ) );
+				x5.set( midpoint( x0.x, x2.x ), midpoint( x0.y, x2.y ) );
+
+				newUv( newUVs, x3, x4, x5 );
+				newUv( newUVs, x0, x3, x5 );
+
+				newUv( newUVs, x1, x4, x3 );
+				newUv( newUVs, x2, x5, x4 );
+
+			}
+
+		}
+
+		// Overwrite old arrays
+		geometry.vertices = newVertices;
+		geometry.faces = newFaces;
+		if ( hasUvs ) geometry.faceVertexUvs[ 0 ] = newUVs;
+
+		// console.log('done');
+
+	};
+
+} )();
+
+ return THREE.SubdivisionModifier;
+});
+define('modifiers/TessellateModifier',["three"], function(THREE){
+/**
+ * Break faces with edges longer than maxEdgeLength
+ * - not recursive
+ *
+ * @author alteredq / http://alteredqualia.com/
+ */
+
+THREE.TessellateModifier = function ( maxEdgeLength ) {
+
+	this.maxEdgeLength = maxEdgeLength;
+
+};
+
+THREE.TessellateModifier.prototype.modify = function ( geometry ) {
+
+	var edge;
+
+	var faces = [];
+	var faceVertexUvs = [];
+	var maxEdgeLengthSquared = this.maxEdgeLength * this.maxEdgeLength;
+
+	for ( var i = 0, il = geometry.faceVertexUvs.length; i < il; i ++ ) {
+
+		faceVertexUvs[ i ] = [];
+
+	}
+
+	for ( var i = 0, il = geometry.faces.length; i < il; i ++ ) {
+
+		var face = geometry.faces[ i ];
+
+		if ( face instanceof THREE.Face3 ) {
+
+			var a = face.a;
+			var b = face.b;
+			var c = face.c;
+
+			var va = geometry.vertices[ a ];
+			var vb = geometry.vertices[ b ];
+			var vc = geometry.vertices[ c ];
+
+			var dab = va.distanceToSquared( vb );
+			var dbc = vb.distanceToSquared( vc );
+			var dac = va.distanceToSquared( vc );
+
+			if ( dab > maxEdgeLengthSquared || dbc > maxEdgeLengthSquared || dac > maxEdgeLengthSquared ) {
+
+				var m = geometry.vertices.length;
+
+				var triA = face.clone();
+				var triB = face.clone();
+
+				if ( dab >= dbc && dab >= dac ) {
+
+					var vm = va.clone();
+					vm.lerp( vb, 0.5 );
+
+					triA.a = a;
+					triA.b = m;
+					triA.c = c;
+
+					triB.a = m;
+					triB.b = b;
+					triB.c = c;
+
+					if ( face.vertexNormals.length === 3 ) {
+
+						var vnm = face.vertexNormals[ 0 ].clone();
+						vnm.lerp( face.vertexNormals[ 1 ], 0.5 );
+
+						triA.vertexNormals[ 1 ].copy( vnm );
+						triB.vertexNormals[ 0 ].copy( vnm );
+
+					}
+
+					if ( face.vertexColors.length === 3 ) {
+
+						var vcm = face.vertexColors[ 0 ].clone();
+						vcm.lerp( face.vertexColors[ 1 ], 0.5 );
+
+						triA.vertexColors[ 1 ].copy( vcm );
+						triB.vertexColors[ 0 ].copy( vcm );
+
+					}
+
+					edge = 0;
+
+				} else if ( dbc >= dab && dbc >= dac ) {
+
+					var vm = vb.clone();
+					vm.lerp( vc, 0.5 );
+
+					triA.a = a;
+					triA.b = b;
+					triA.c = m;
+
+					triB.a = m;
+					triB.b = c;
+					triB.c = a;
+
+					if ( face.vertexNormals.length === 3 ) {
+
+						var vnm = face.vertexNormals[ 1 ].clone();
+						vnm.lerp( face.vertexNormals[ 2 ], 0.5 );
+
+						triA.vertexNormals[ 2 ].copy( vnm );
+
+						triB.vertexNormals[ 0 ].copy( vnm );
+						triB.vertexNormals[ 1 ].copy( face.vertexNormals[ 2 ] );
+						triB.vertexNormals[ 2 ].copy( face.vertexNormals[ 0 ] );
+
+					}
+
+					if ( face.vertexColors.length === 3 ) {
+
+						var vcm = face.vertexColors[ 1 ].clone();
+						vcm.lerp( face.vertexColors[ 2 ], 0.5 );
+
+						triA.vertexColors[ 2 ].copy( vcm );
+
+						triB.vertexColors[ 0 ].copy( vcm );
+						triB.vertexColors[ 1 ].copy( face.vertexColors[ 2 ] );
+						triB.vertexColors[ 2 ].copy( face.vertexColors[ 0 ] );
+
+					}
+
+					edge = 1;
+
+				} else {
+
+					var vm = va.clone();
+					vm.lerp( vc, 0.5 );
+
+					triA.a = a;
+					triA.b = b;
+					triA.c = m;
+
+					triB.a = m;
+					triB.b = b;
+					triB.c = c;
+
+					if ( face.vertexNormals.length === 3 ) {
+
+						var vnm = face.vertexNormals[ 0 ].clone();
+						vnm.lerp( face.vertexNormals[ 2 ], 0.5 );
+
+						triA.vertexNormals[ 2 ].copy( vnm );
+						triB.vertexNormals[ 0 ].copy( vnm );
+
+					}
+
+					if ( face.vertexColors.length === 3 ) {
+
+						var vcm = face.vertexColors[ 0 ].clone();
+						vcm.lerp( face.vertexColors[ 2 ], 0.5 );
+
+						triA.vertexColors[ 2 ].copy( vcm );
+						triB.vertexColors[ 0 ].copy( vcm );
+
+					}
+
+					edge = 2;
+
+				}
+
+				faces.push( triA, triB );
+				geometry.vertices.push( vm );
+
+				for ( var j = 0, jl = geometry.faceVertexUvs.length; j < jl; j ++ ) {
+
+					if ( geometry.faceVertexUvs[ j ].length ) {
+
+						var uvs = geometry.faceVertexUvs[ j ][ i ];
+
+						var uvA = uvs[ 0 ];
+						var uvB = uvs[ 1 ];
+						var uvC = uvs[ 2 ];
+
+						// AB
+
+						if ( edge === 0 ) {
+
+							var uvM = uvA.clone();
+							uvM.lerp( uvB, 0.5 );
+
+							var uvsTriA = [ uvA.clone(), uvM.clone(), uvC.clone() ];
+							var uvsTriB = [ uvM.clone(), uvB.clone(), uvC.clone() ];
+
+						// BC
+
+						} else if ( edge === 1 ) {
+
+							var uvM = uvB.clone();
+							uvM.lerp( uvC, 0.5 );
+
+							var uvsTriA = [ uvA.clone(), uvB.clone(), uvM.clone() ];
+							var uvsTriB = [ uvM.clone(), uvC.clone(), uvA.clone() ];
+
+						// AC
+
+						} else {
+
+							var uvM = uvA.clone();
+							uvM.lerp( uvC, 0.5 );
+
+							var uvsTriA = [ uvA.clone(), uvB.clone(), uvM.clone() ];
+							var uvsTriB = [ uvM.clone(), uvB.clone(), uvC.clone() ];
+
+						}
+
+						faceVertexUvs[ j ].push( uvsTriA, uvsTriB );
+
+					}
+
+				}
+
+			} else {
+
+				faces.push( face );
+
+				for ( var j = 0, jl = geometry.faceVertexUvs.length; j < jl; j ++ ) {
+
+					faceVertexUvs[ j ].push( geometry.faceVertexUvs[ j ][ i ] );
+
+				}
+
+			}
+
+		}
+
+	}
+
+	geometry.faces = faces;
+	geometry.faceVertexUvs = faceVertexUvs;
+
+};
+
+ return THREE.TessellateModifier;
+});
+/* 
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+define('threeVP-Modifiers',[
+    "modifiers/ExplodeModifier", 
+    "modifiers/SimplifyModifier", 
+    "modifiers/SubdivisionModifier", 
+    "modifiers/TessellateModifier"], 
+    function( 
+        ExplodeModifier, 
+        SimplifyModifier, 
+        SubdivisionModifier, 
+        TessellateModifier )
+    {
+        return { 
+            modifier : {
+                "ExplodeModifier"       : ExplodeModifier,
+                "SimplifyModifier"      : SimplifyModifier,
+                "SubdivisionModifier"   : SubdivisionModifier,
+                "TessellateModifier"    : TessellateModifier
+            }
+        };
+});
+
 /* 
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
@@ -19264,13 +20480,16 @@ define('image',[],function(){
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-define('threeVP-Extras',["lodash", "pack-postprocessing", "pack-shaders", "pack-Interactive", "threeVP-Loaders", "pack-Animation", "pack-Factorys", "plugins/plg.Tween", 
+define('threeVP-Extras',["lodash", 
+    "pack-postprocessing", "pack-shaders", "pack-Interactive", "threeVP-Loaders", "pack-Animation", "pack-Factorys", "threeVP-Modifiers",
+    "plugins/plg.Tween", 
     "utilities/ModelDatGui", "factorys/Factory",
     "lights/Sunlight", "lights/Volumetricspotlight", "objects/Floor/Floor", "SkyBox", "image", "base64", "i18n"], 
-function( _, postprocessing, shaders, interactive, loaders, animation, factorys, PlgTween, 
+function( _, postprocessing, shaders, interactive, loaders, animation, factorys, modifiers,
+            PlgTween, 
             ModelDatGui,  Factory,
             Sunlight, Volumetricspotlight, Floor, SkyBox ){
-    return _.extend( {}, postprocessing, shaders, interactive, loaders, animation, factorys, {
+    return _.extend( {}, postprocessing, shaders, interactive, loaders, animation, factorys, modifiers, {
         PlgTween    : PlgTween,
         Factory     : Factory,
         ModelDatGui : ModelDatGui,
