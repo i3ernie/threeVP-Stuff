@@ -1,10 +1,17 @@
-define(["three"], function( THREE ){
+define(["three", "lodash"], function( THREE, _ ){
+    
+    const defaults = {
+        color		: 0x4444aa
+    };
 
-    let LaserBeam	= function( options )
+    let LaserBeam	= function( opts )
     {
 	let scope	= this;
         
-	this.object3d	= new THREE.Object3D();
+        this.options = _.extend({}, defaults, opts);
+        let o = this.options;
+        
+	THREE.Object3D.call( this );
 	// generate the texture
 	var canvas	= generateLaserBodyCanvas();
 	var texture	= new THREE.Texture( canvas );
@@ -14,7 +21,7 @@ define(["three"], function( THREE ){
         let material = new THREE.MeshBasicMaterial({
 		map		: texture,
 		blending	: THREE.AdditiveBlending,
-		color		: 0x4444aa,
+		color		: o.color,
 		side		: THREE.DoubleSide,
 		depthWrite	: false,
 		transparent	: true
@@ -27,7 +34,7 @@ define(["three"], function( THREE ){
 		let mesh = new THREE.Mesh( geometry, material );
 		mesh.position.x	= 1/2;
 		mesh.rotation.x	= i/nPlanes * Math.PI;
-		scope.object3d.add( mesh );
+		scope.add( mesh );
 	}
 	
 	function generateLaserBodyCanvas( options ){
@@ -54,6 +61,12 @@ define(["three"], function( THREE ){
             return canvas;	
 	}
     };
+    
+    //inherit from THREE.Object3D
+    LaserBeam.prototype = Object.assign( Object.create( THREE.Object3D.prototype ),
+    {
+        constructor : LaserBeam
+    });
     
     return LaserBeam;
 

@@ -53,16 +53,15 @@ define(["three", "lodash"], function( THREE, _ )
         this.addEventListener( "added", this.onAdded.bind(this) );
     };
 
-    //inherits from Mesh
+    //inherits from PointLight
     MovingLight.prototype = Object.create( THREE.PointLight.prototype );
     MovingLight.prototype.constructor = MovingLight;
-    MovingLight.prototype.super = THREE.Mesh;
     
     MovingLight.prototype.onAdded = function()
     {
-        var scope = this;
-        let min = this.options.minPosition + this.options.maxPosition;
-        let max = this.options.maxPosition - this.options.minPosition;
+        let scope = this;
+        const min = this.options.minPosition + this.options.maxPosition;
+        const max = this.options.maxPosition - this.options.minPosition;
         
         this.VP.loop.add( function(){
           let time = Date.now() * .0005;

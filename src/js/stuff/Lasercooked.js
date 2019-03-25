@@ -1,48 +1,50 @@
-define(["module", "three", "lodash"], function( module, THREE, _ ) 
+define(["module", "three", "lodash", "./Laserbeam"], function( module, THREE, _, LaserBeam ) 
 {  
-
-    let LaserCooked	= function( VP, laserBeam )
+    let defaults = {
+        texturesPath : module.uri.substring(0, module.uri.lastIndexOf("/")+1 ) + "textures/"
+    };
+    
+    let LaserCooked	= function( VP, opts )
     {
         let scope = this;
-
-        //console.assert( laserBeam instanceof Laserbeam, "ERROR: Laserbeam" );
-
-        var object3d = laserBeam.object3d;
+        
+        this.options = _.extend({}, defaults, opts);
+        
+        this.object3d	= new LaserBeam();
 
         // build THREE.Sprite for impact
-        var textureUrl	= LaserCooked.baseURL + 'images/blue_particle.jpg';
-        var texture	= new THREE.TextureLoader().load(textureUrl);	
-        var material	= new THREE.SpriteMaterial({
-                map		: texture,
-                blending	: THREE.AdditiveBlending
+        let texture	= new THREE.TextureLoader().load( this.options.texturesPath + 'blue_particle.jpg' );	
+        let material	= new THREE.SpriteMaterial({
+            map		: texture,
+            blending	: THREE.AdditiveBlending
         });
 
-        var sprite = new THREE.Sprite( material );
+        let sprite = new THREE.Sprite( material );
         sprite.scale.x = 0.5;
         sprite.scale.y = 2;
 
         sprite.position.x	= 1-0.01;
-        object3d.add( sprite );
+        scope.object3d.add( sprite );
 
         // add a point light
-        var light	= new THREE.PointLight( 0x4444ff);
+        let light = new THREE.PointLight( 0x4444ff);
         light.intensity	= 0.5;
         light.distance	= 4;
         light.position.x= -0.05;
         this.light	= light;
-        sprite.add(light);
+        sprite.add( light );
 
         // to exports last intersects
         this.lastIntersects	= [];
 
         var raycaster	= new THREE.Raycaster();
         // TODO assume object3d.position are worldPosition. works IFF attached to scene
-        raycaster.ray.origin.copy(object3d.position);
-
-	VP.loop.add( function(){
+        raycaster.ray.origin.copy( scope.object3d.position );
+        
+	this._animation = function(){
             // get laserBeam matrixWorld
-            object3d.updateMatrixWorld();
-            var matrixWorld	= object3d.matrixWorld.clone();
+            scope.object3d.updateMatrixWorld();
+            var matrixWorld	= scope.object3d.matrixWorld.clone();
             // set the origin
             raycaster.ray.origin.setFromMatrixPosition(matrixWorld);
             // keep only the roation
@@ -55,18 +57,24 @@ define(["module", "three", "lodash"], function( module, THREE, _ )
 
             let intersects		= raycaster.intersectObjects( VP.scene.children );
             if( intersects.length > 0 ){
-                    var position	= intersects[0].point;
-                    var distance	= position.distanceTo(raycaster.ray.origin);
-                    object3d.scale.x	= distance;
+                var position	= intersects[0].point;
+                var distance	= position.distanceTo(raycaster.ray.origin);
+                scope.object3d.scale.x	= distance;
             }else{
-                    object3d.scale.x	= 10;	
+                scope.object3d.scale.x	= 10;	
             }
             // backup last intersects
             scope.lastIntersects = intersects;
-	});
+	};
+        
+        scope.object3d.addEventListener("added", function(){
+            VP.loop.add( scope._animation );
+        });
+        
+        scope.object3d.addEventListener("removed", function(){
+            VP.loop.remove( scope._animation );
+        });
     };
-
-    LaserCooked.baseURL	= '../';
 
     return LaserCooked;
 
