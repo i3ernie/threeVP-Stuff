@@ -1,10 +1,10 @@
 /**
  * Created by bernie on 27.10.15.
  */
-define(["three", "lodash", "globals", "cmd", "Viewport", 
+define(["three", "lodash", "globals", "cmd", "Viewport", "extras/Animated",
     "SkyBox", "lights/Sunlight", "stuff/Terrain", "stuff/MovingLight",
      "stuff/RandomObject"],
-function (THREE, _, GLOBALS, CMD, Viewport, 
+function (THREE, _, GLOBALS, CMD, Viewport, Animated,
               SkyBox, Sunlight, Terrain, MovingLight, RandomObject)
 {
     var VP;
@@ -40,6 +40,8 @@ function (THREE, _, GLOBALS, CMD, Viewport,
         this.init = function( done )
         {
             VP = GLOBALS.VP = new Viewport();
+            
+            Animated.init( VP );
           
            if ( typeof done === "function" ) done( null, this );
         };
@@ -69,7 +71,7 @@ function (THREE, _, GLOBALS, CMD, Viewport,
             let floorMesh = new Terrain( {width : options.terrainWidth, depth : options.terrainDepth} );
             floorMesh.position.set( 0, -5, 0 );
             
-            VP.scene.add( new MovingLight (VP, {maxPosition : 10, size :1}) );
+            VP.scene.add( new MovingLight ( {maxPosition : 10, size :1}) );
             
           
             VP.scene.add( floorMesh );

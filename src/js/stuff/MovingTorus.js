@@ -4,7 +4,7 @@
  * and open the template in the editor.
  */
 
-define(["three", "lodash"], function( THREE, _ ){
+define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated ){
     
     let defaults = {
         color	: 0xffffff,
@@ -27,32 +27,36 @@ define(["three", "lodash"], function( THREE, _ ){
 
         THREE.Mesh.call(this, geometry, material );
         this.scale.set(1, 1, 1).multiplyScalar( 5 );
-        
-        this._animation = function( delta, now ){ 
-            let angle	= 0.1*Math.PI*2*now;
-            angle	= Math.cos( angle )*Math.PI/15 + 3*Math.PI/2;
-            let radius	= 30;
-            scope.position.x	= Math.cos(angle)*radius;
-            scope.position.y	= (radius-1)+Math.sin(angle)*radius;
-            scope.position.z	= 0.1;	// Couch	
-        };
+       
+        this.initAnimation();
         
         this.addEventListener( "added", this.onAdded.bind(this) );
         this.addEventListener( "removed", this.onRemoved.bind(this) );
     };
     
     //inherits from Mesh
-    MovingTorus.prototype = Object.create( THREE.Mesh.prototype );
-    MovingTorus.prototype.constructor = MovingTorus;
+    MovingTorus.prototype = Object.assign( Object.create( THREE.Mesh.prototype ), Animated.prototype,
+    {
+        constructor : MovingTorus,
+        
+        animation : function( delta, now ){ 
+            let angle	= 0.1*Math.PI*2*now;
+            angle	= Math.cos( angle )*Math.PI/15 + 3*Math.PI/2;
+            let radius	= 30;
+            this.position.x	= Math.cos(angle)*radius;
+            this.position.y	= (radius-1)+Math.sin(angle)*radius;
+            this.position.z	= 0.1;	// Couch	
+        }
+    });
     
     MovingTorus.prototype.onAdded = function()
     {        
-        this.VP.loop.add( this._animation );
+       
     };
     
     MovingTorus.prototype.onRemoved = function()
     {
-        this.VP.loop.remove( this._animation );
+        
     };
     
     return MovingTorus;

@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-define(["three", "lodash"], function( THREE, _ )
+define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated )
 {
     let defaults = {
         shadow : true,
@@ -28,12 +28,9 @@ define(["three", "lodash"], function( THREE, _ )
     };	
 
               
-    let MovingLight = function( VP, opt )
+    let MovingLight = function( opt )
     {
         this.options = _.extend({}, defaults, opt);
-        this.VP = VP;
-        
-        var scope = this;
         
         let geometry = new THREE.SphereGeometry( this.options.size, 16, 8 );
         
@@ -50,23 +47,19 @@ define(["three", "lodash"], function( THREE, _ )
         
         if ( this.options.shadow ) this.castShadow = true;
         
-        this.addEventListener( "added", this.onAdded.bind(this) );
+        this.initAnimation();
     };
 
     //inherits from PointLight
-    MovingLight.prototype = Object.create( THREE.PointLight.prototype );
+    MovingLight.prototype = Object.assign( Object.create( THREE.PointLight.prototype ), Animated.prototype );
     MovingLight.prototype.constructor = MovingLight;
     
-    MovingLight.prototype.onAdded = function()
+    MovingLight.prototype.animation = function( delta, now )
     {
-        let scope = this;
         const min = this.options.minPosition + this.options.maxPosition;
         const max = this.options.maxPosition - this.options.minPosition;
         
-        this.VP.loop.add( function(){
-          let time = Date.now() * .0005;
-          scope.position.y = Math.cos( time ) * max + min;  
-        });
+        this.position.y = Math.cos( Date.now() * .0005 ) * max + min;  
     };
     
     return MovingLight;

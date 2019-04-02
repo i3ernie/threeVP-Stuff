@@ -1,10 +1,10 @@
 /**
  * Created by bernie on 27.10.15.
  */
-define(["three", "lodash", "globals", "cmd", "Viewport", 
+define(["three", "lodash", "globals", "cmd", "Viewport", "extras/Animated",
      "stuff/Outbox", "stuff/MovingTorus",
      "stuff/Lasercooked"],
-function (THREE, _, GLOBALS, CMD, Viewport, 
+function (THREE, _, GLOBALS, CMD, Viewport, Animated,
               Outbox, MovingTorus, LaserCooked )
 {
     var VP;
@@ -32,6 +32,8 @@ function (THREE, _, GLOBALS, CMD, Viewport,
         this.init = function( done )
         {
             VP = GLOBALS.VP = new Viewport();
+            
+            Animated.init( VP );
           
            if ( typeof done === "function" ) done( null, this );
         };
