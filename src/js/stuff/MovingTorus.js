@@ -4,41 +4,47 @@
  * and open the template in the editor.
  */
 
-define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated ){
+define(["three", "lodash", "backbone", "extras/Animated"], function( THREE, _, Backbone, Animated ){
     
-    let defaults = {
-        color	: 0xffffff,
-        specular: 0xffffff,
-        shininess: 200
-    };
+    const Model = Backbone.Model.extend({
+            defaults : {
+            color	: 0xffffff,
+            specular: 0xffffff,
+            shininess: 200,
+            radius : .5,
+            tube : .15
+        }
+    });
+    
     
     let MovingTorus = function( VP, opts )
     {
         this.VP = VP;
-        this.options = _.extend({}, defaults, opts);
-        
-        let geometry = new THREE.TorusGeometry(0.5-0.15, 0.15, 32, 32);
+        this.model = new Model( opts );
+
+        let o = this.model.attributes;
+
+        let geometry = new THREE.TorusGeometry( o.radius-o.tube, o.tube, 32, 32 );
         let material	= new THREE.MeshPhongMaterial({
-            color	: this.options.color,
-            specular    : this.options.specular,
-            shininess   : this.options.shininess
+            color	: o.color,
+            specular    : o.specular,
+            shininess   : o.shininess
         });
-        let scope = this;
 
         THREE.Mesh.call(this, geometry, material );
         this.scale.set(1, 1, 1).multiplyScalar( 5 );
-       
+
         this.initAnimation();
-        
-        this.addEventListener( "added", this.onAdded.bind(this) );
-        this.addEventListener( "removed", this.onRemoved.bind(this) );
+
+        this.addEventListener( "added", this.onAdded );
+        this.addEventListener( "removed", this.onRemoved );
     };
-    
+
     //inherits from Mesh
     MovingTorus.prototype = Object.assign( Object.create( THREE.Mesh.prototype ), Animated.prototype,
     {
         constructor : MovingTorus,
-        
+
         animation : function( delta, now ){ 
             let angle	= 0.1*Math.PI*2*now;
             angle	= Math.cos( angle )*Math.PI/15 + 3*Math.PI/2;
@@ -48,17 +54,12 @@ define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated ){
             this.position.z	= 0.1;	// Couch	
         }
     });
-    
-    MovingTorus.prototype.onAdded = function()
-    {        
-       
+
+    MovingTorus.prototype.onAdded = function() {        
     };
-    
-    MovingTorus.prototype.onRemoved = function()
-    {
-        
+
+    MovingTorus.prototype.onRemoved = function() {
     };
-    
+
     return MovingTorus;
 });
-
