@@ -3,17 +3,21 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated )
+define(["three", "lodash", "backbone", "extras/Animated"], function( THREE, _, Backbone, Animated )
 {
-    let defaults = {
-        shadow : true,
-        size : 0.02,
-        
-        maxPosition : 1,
-        minPosition : 1.25,
-        
-        color : 0xffffee
-    };
+    let Model = Backbone.Model.extend({
+        defaults : {
+            shadow : true,
+            size : 0.02,
+
+            maxPosition : 1,
+            minPosition : 1.25,
+            
+            power : 20,
+
+            color : 0xffffee
+        }
+    });
     
     // ref for lumens: http://www.power-sure.com/lumens.htm
     const luminousPowers = {
@@ -30,22 +34,24 @@ define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated )
               
     let MovingLight = function( opt )
     {
-        this.options = _.extend({}, defaults, opt);
+        this.model = new Model( opt );
+        let o = this.model.attributes;
         
-        let geometry = new THREE.SphereGeometry( this.options.size, 16, 8 );
+        let geometry = new THREE.SphereGeometry( o.size, 16, 8 );
         
         let bulbMat = new THREE.MeshStandardMaterial( {
-            emissive : this.options.color,
+            emissive : o.color,
             emissiveIntensity : 1,
             color : 0x000000
         });	
         
         THREE.PointLight.call( this, 0xffee88, 1, 100, 2 );
+        this.power = o.power;
         
         this.add( new THREE.Mesh( geometry, bulbMat ) );
         this.position.set( 0, 2, 0 );
         
-        if ( this.options.shadow ) this.castShadow = true;
+        if ( o.shadow ) this.castShadow = true;
         
         this.initAnimation();
     };
@@ -56,8 +62,9 @@ define(["three", "lodash", "extras/Animated"], function( THREE, _, Animated )
     
     MovingLight.prototype.animation = function( delta, now )
     {
-        const min = this.options.minPosition + this.options.maxPosition;
-        const max = this.options.maxPosition - this.options.minPosition;
+        let o = this.model.attributes;
+        const min = o.minPosition + o.maxPosition;
+        const max = o.maxPosition - o.minPosition;
         
         this.position.y = Math.cos( Date.now() * .0005 ) * max + min;  
     };
