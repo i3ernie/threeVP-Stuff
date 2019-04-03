@@ -2,7 +2,7 @@
  * Created by bernie on 27.10.15.
  */
 define(["three", "lodash", "globals", "cmd", "Viewport", "extras/Animated",
-    "SkyBox", "lights/Sunlight", "stuff/Outbox", "stuff/VolumetricSpotlight",
+    "SkyBox", "lights/Sunlight", "stuff/Outbox", "stuff/lights/VolumetricSpotlight",
      "stuff/RandomObject"],
 function (THREE, _, GLOBALS, CMD, Viewport, Animated,
               SkyBox, Sunlight, Outbox, VolumetricSpotlight, RandomObject)

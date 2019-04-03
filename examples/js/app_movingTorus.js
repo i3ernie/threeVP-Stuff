@@ -3,7 +3,7 @@
  */
 define(["three", "lodash", "globals", "cmd", "Viewport", "extras/Animated",
      "stuff/Outbox", "stuff/MovingTorus",
-     "stuff/Lasercooked"],
+     "stuff/lights/Lasercooked"],
 function (THREE, _, GLOBALS, CMD, Viewport, Animated,
               Outbox, MovingTorus, LaserCooked )
 {
