@@ -12,10 +12,11 @@
   "author": "i3ernie",
   "contributors": [],
   "dependencies": {
-    "lodash": "^4.17.10",
+    "lodash": "latest",
     "stats-js": "latest",
     "threeVP": "git://github.com/i3ernie/threeVP.js.git",
-    "threeVP-Extras": "git://github.com/i3ernie/threeVP-Extras.js.git",
+    "three-viewport": "git://github.com/i3ernie/three-viewport.git",
+    "three-shadow-contact": "git://github.com/i3ernie/three-shadowContact.git",
     "tween.js": "latest"
   },
   "devDependencies": {
